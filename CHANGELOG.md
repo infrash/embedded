@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.8] - 2025-04-06
+
+### Added
+- Changes in examples/filter_example.py
+- Changes in src/infrash_embedded/comment_helpers.py
+
 ## [0.1.7] - 2025-04-06
 
 ### Added

@@ -262,26 +262,22 @@ def comment_command(args):
     """Handle the 'comment' command - add energy optimization comments to source files."""
     print(f"{Fore.BLUE}Adding energy optimization comments to project: {args.project_path}{Style.RESET_ALL}")
 
-    # Create file filter with command line options
-    file_filter = create_default_filter(
-        include_only_extensions=args.include_extensions,
-        exclude_directories=args.exclude_dirs
-    )
-
-    # Add custom exclude patterns if provided
-    if args.exclude_patterns:
-        custom_patterns = []
-        for pattern in args.exclude_patterns:
-            try:
-                # Validate regex pattern
-                re.compile(pattern)
-                custom_patterns.append(pattern)
-            except re.error:
-                logger.warning(f"Invalid regex pattern: {pattern}, skipping")
-
-        if custom_patterns:
-            file_filter.exclude_patterns.extend(custom_patterns)
-            file_filter.exclude_regex.extend([re.compile(p) for p in custom_patterns])
+    try:
+        # Create file filter with command line options
+        # Use create_custom_filter instead of create_default_filter
+        file_filter = create_custom_filter(
+            exclude_patterns=args.exclude_patterns,
+            include_only_extensions=args.include_extensions,
+            exclude_directories=args.exclude_dirs
+        )
+    except TypeError:
+        # Fallback if the function doesn't accept those parameters
+        logger.debug("Falling back to basic FileFilter initialization")
+        file_filter = FileFilter(
+            exclude_patterns=DEFAULT_EXCLUDE_PATTERNS,
+            include_only_extensions=args.include_extensions,
+            exclude_directories=args.exclude_dirs or DEFAULT_EXCLUDE_DIRS
+        )
 
     # First analyze to find issues
     analyzer = CodeAnalyzer(args.project_path)
@@ -322,10 +318,17 @@ def comment_command(args):
         if file_path:
             full_path = os.path.join(args.project_path, file_path)
 
-            # Skip filtered files
-            if file_filter.should_exclude(full_path):
-                logger.debug(f"Skipping filtered file: {full_path}")
-                continue
+            # Skip filtered files - check if file should be excluded
+            if hasattr(file_filter, 'should_exclude'):
+                if file_filter.should_exclude(full_path):
+                    logger.debug(f"Skipping filtered file: {full_path}")
+                    continue
+            # Filter by extension directly if the filter doesn't have should_exclude
+            elif hasattr(file_filter, 'include_only_extensions') and file_filter.include_only_extensions:
+                _, ext = os.path.splitext(full_path)
+                if ext.lower() not in file_filter.include_only_extensions:
+                    logger.debug(f"Skipping file with excluded extension: {full_path}")
+                    continue
 
             if full_path not in issues_by_file:
                 issues_by_file[full_path] = []

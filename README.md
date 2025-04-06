@@ -203,11 +203,11 @@ energy-optimizer/
 
 ## New Files
 
-### 1. `file_filter.py`
+### 1. `filter.py`
 
 This new module contains the `FileFilter` class and related functions for filtering files during analysis and commenting operations. It allows excluding backup files, temporary files, and files with specific extensions or in specific directories.
 
-### 2. `utils/comment_helpers.py`
+### 2. `comment_helpers.py`
 
 This module contains the improved helper functions for generating more specific and context-aware energy optimization comments:
 
@@ -260,6 +260,132 @@ Documentation specifically for the file filtering functionality, including examp
     - Providing more specific suggestions
     - Including concrete code examples
     - Explaining energy impact in understandable terms
+
+
+
+
+
+## Step 3: Update Other Commands
+
+Similarly update the `analyze_command()`, `deep_analyze_command()`, and `optimize_command()` functions to respect file filtering where appropriate. The general pattern is:
+
+1. Create a file filter using the command line arguments
+2. Filter the files before processing them
+3. Skip files that should be excluded
+
+## Step 4: Testing
+
+Test the integration by running commands with various filtering options:
+
+```bash
+# Test basic file filtering
+python cli.py comment /path/to/project --exclude-patterns ".*\.bak$"
+
+# Test with extension filtering
+python cli.py comment /path/to/project --include-extensions .c .h
+
+# Test with directory filtering
+python cli.py comment /path/to/project --exclude-dirs build test
+
+# Test the dry-run mode
+python cli.py comment /path/to/project --dry-run --exclude-patterns ".*\.bak$"
+```
+
+
+```bash
+python cli.py comment "../../zlecenia/maski/Programator_2025" --include-extensions .c .h
+```
+
+```bash
+python ./src/infrash_embedded/cli.py comment "../../zlecenia/maski/Programator_2025" --include-extensions .c
+```
+
+
+Let me continue with the implementation of the `utils/comment_helpers.py` file:
+
+I've prepared all the necessary files and documentation to integrate file filtering capabilities into your Energy Optimizer tool. This will allow you to easily exclude backup files and other unwanted files from analysis and comment operations.
+
+## What I've Created
+
+1. **File Filtering Module**: A comprehensive file filtering system that can exclude files based on patterns, extensions, and directories.
+
+2. **Improved Comment Helpers**: Functions that generate more context-aware and specific energy optimization suggestions.
+
+3. **CLI Integration**: Updated command-line interface that supports file filtering options.
+
+4. **Example Script**: A demonstration of how to use file filtering both from the command line and programmatically.
+
+5. **Integration Guide**: Step-by-step instructions for integrating these changes into your existing codebase.
+
+## Key Features
+
+- **Exclude backup files** (`*.bak`, `*~`) from being modified
+- **Filter by extension** (e.g., only process `.c` and `.h` files)
+- **Exclude specific directories** (e.g., `build`, `test`)
+- **Custom filter patterns** using regular expressions
+- **Default exclusion patterns** for common types of files to ignore
+
+## How to Use
+
+After integrating the changes, you can use file filtering in several ways:
+
+### Command Line Examples
+
+```bash
+# Exclude backup files
+python cli.py comment /path/to/project --exclude-patterns ".*\.bak$"
+
+# Only include C and header files
+python cli.py comment /path/to/project --include-extensions .c .h
+
+# Exclude specific directories
+python cli.py comment /path/to/project --exclude-dirs build test docs
+
+# Combined filtering with other options
+python cli.py comment /path/to/project \
+  --dry-run \
+  --format todo \
+  --min-impact 0.7 \
+  --exclude-patterns ".*\.bak$" ".*~$" \
+  --exclude-dirs build
+```
+
+### Programmatic Examples
+
+```python
+from file_filter import FileFilter, create_default_filter
+
+# Create a default filter (excludes common files)
+default_filter = create_default_filter()
+
+# Create a custom filter
+custom_filter = FileFilter(
+    exclude_patterns=[".*\.bak$", ".*~$"],
+    include_only_extensions=['.c', '.h'],
+    exclude_directories=['build', 'test']
+)
+
+# Filter a list of files
+filtered_files = custom_filter.filter_files(all_files)
+```
+
+## Step 5: Update Documentation
+
+Update your project documentation to include information about the new file filtering capabilities:
+
+1. Add a section in your README.md about file filtering
+2. Update your usage documentation
+3. Add examples of how to use the filtering options
+
+## Summary of Changes
+
+- Added file filtering module (`file_filter.py`)
+- Added improved comment helper functions (`utils/comment_helpers.py`)
+- Updated CLI to support file filtering options
+- Modified command functions to respect file filtering
+- Added example script demonstrating file filtering
+
+The file filtering integration is now complete, and users can exclude backup files and other unwanted files from analysis and comment operations.
 
 
 ## Contributing
