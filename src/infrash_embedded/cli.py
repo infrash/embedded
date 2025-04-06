@@ -5,17 +5,23 @@ import logging
 from typing import Dict, List, Any
 import colorama
 from colorama import Fore, Style
-import optimization
-import deep_analyzer
-import analyzer
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
+
+from optimization import EnergyIssue, CodeOptimizer, Deployer, CodeAnalyzer, ReportGenerator
+# Import the deep analyzer module
+from deep_analyzer import deep_analyze_code, generate_optimization_summary
+from _version import __version__
+
+# Setup global logger (add this near the beginning of the file, with other imports)
+logger = logging.getLogger("energy-optimizer.cli")
+
 
 
 def deep_analyze_command(args):
     """Handle the 'deep-analyze' command."""
     print(f"{Fore.BLUE}Performing deep energy analysis on project: {args.project_path}{Style.RESET_ALL}")
 
-    # Import the deep analyzer module
-    from .deep_analyzer import deep_analyze_code, generate_optimization_summary
 
     # Setup configuration from command line arguments
     config = {
@@ -243,6 +249,103 @@ def deploy_command(args):
         print(f"{Fore.RED}Deployment failed.{Style.RESET_ALL}")
         sys.exit(1)
 
+def comment_command(args):
+    """Handle the 'comment' command - add energy optimization comments to source files."""
+    print(f"{Fore.BLUE}Adding energy optimization comments to project: {args.project_path}{Style.RESET_ALL}")
+
+    # First analyze to find issues
+    analyzer = CodeAnalyzer(args.project_path)
+    issues = analyzer.analyze()
+
+    if not issues:
+        print(f"{Fore.GREEN}No energy issues found. Nothing to comment.{Style.RESET_ALL}")
+        return
+
+    # Count of files that would be modified
+    modified_files = set()
+    comment_count = 0
+
+    # Process each issue
+    for issue in issues:
+        file_path = os.path.join(args.project_path, issue.file)
+        modified_files.add(file_path)
+        comment_count += 1
+
+    # Display what would be done in dry-run mode
+    if args.dry_run:
+        print(f"\n{Fore.YELLOW}Dry run mode - no changes will be made{Style.RESET_ALL}")
+        print(f"Would add {comment_count} comments to {len(modified_files)} files")
+        for file_path in sorted(modified_files):
+            relative_path = os.path.relpath(file_path, args.project_path)
+            file_issues = [i for i in issues if i.file == relative_path]
+            print(f"  {relative_path}: {len(file_issues)} comments")
+        return
+
+    # Make the actual changes
+    files_modified = 0
+    comments_added = 0
+
+    for file_path in sorted(modified_files):
+        relative_path = os.path.relpath(file_path, args.project_path)
+        file_issues = [i for i in issues if i.file == relative_path]
+
+        # Read the file content
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                lines = f.readlines()
+        except Exception as e:
+            logger.error(f"Error reading file {relative_path}: {e}")
+            continue
+
+        # Create backup if not disabled
+        if not args.no_backup:
+            backup_path = file_path + '.bak'
+            try:
+                with open(backup_path, 'w', encoding='utf-8') as f:
+                    f.writelines(lines)
+                logger.debug(f"Created backup file: {backup_path}")
+            except Exception as e:
+                logger.error(f"Error creating backup file for {relative_path}: {e}")
+                continue
+
+        # Add comments to the file
+        modified = False
+        for issue in file_issues:
+            if 0 <= issue.line - 1 < len(lines):
+                # Create the comment text based on format preference
+                if args.format == 'inline':
+                    comment = f" // ENERGY: {issue.description} - {issue.suggestion}\n"
+                    # Add comment to the end of the line
+                    line = lines[issue.line - 1].rstrip('\r\n')
+                    lines[issue.line - 1] = line + comment
+                else:  # 'todo' format
+                    comment = f"// TODO: ENERGY OPTIMIZATION: {issue.description} - {issue.suggestion}\n"
+                    # Insert comment on its own line before the code
+                    lines.insert(issue.line - 1, comment)
+                    # Adjust line numbers for subsequent issues in the same file
+                    for i in file_issues:
+                        if i != issue and i.line > issue.line:
+                            i.line += 1
+
+                modified = True
+                comments_added += 1
+                logger.debug(f"Added comment at {relative_path}:{issue.line}")
+
+        # Write back the modified file if changes were made
+        if modified:
+            try:
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.writelines(lines)
+                files_modified += 1
+                logger.info(f"Modified file: {relative_path}")
+            except Exception as e:
+                logger.error(f"Error writing file {relative_path}: {e}")
+
+    print(f"\n{Fore.GREEN}Added {comments_added} energy optimization comments to {files_modified} files{Style.RESET_ALL}")
+    if not args.no_backup:
+        print(f"Backup files created with '.bak' extension")
+
+
 
 def main():
     """Main entry point for the CLI."""
@@ -319,6 +422,8 @@ def main():
         args.func(args)
     else:
         parser.print_help()
+
+
 
 
 if __name__ == "__main__":

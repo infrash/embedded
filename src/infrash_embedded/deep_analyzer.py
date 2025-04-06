@@ -8,17 +8,21 @@ particularly focused on embedded systems and MSP430 microcontrollers.
 
 import os
 import re
+import sys
 import logging
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 from collections import defaultdict
 
-from .analyzer import (
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
+
+from analyzer import (
     EnergyIssue,
     SourceLocation,
     analyze_code,
     CodeAnalysisManager
 )
+from _version import __version__
 
 # Set up logging
 logging.basicConfig(
@@ -700,16 +704,31 @@ class DeepCodeAnalyzer:
 
             for ptype, pattern in peripheral_patterns.items():
                 for match in pattern.finditer(content):
-                    periph_name = match.group(1) if ptype not in ['spi', 'i2c'] else f"{match.group(3)}_{match.group(1)}"
-                    config = match.group(2) if ptype not in ['spi', 'i2c'] else match.group(2)
-                    line_number = content[:match.start()].count('\n') + 1
+                    try:
+                        # Handle different group patterns safely
+                        if ptype in ['spi', 'i2c']:
+                            if len(match.groups()) >= 3:  # Make sure we have enough groups
+                                periph_name = f"{match.group(3)}_{match.group(1)}"
+                                config = match.group(2)
+                            else:
+                                # Skip this match if it doesn't have the expected groups
+                                continue
+                        else:
+                            periph_name = match.group(1)
+                            config = match.group(2)
 
-                    # Check if peripheral is being disabled
-                    is_disabled = False
-                    if 'UCSWRST' in config or '&= ~' in config or 'OFF' in config:
-                        is_disabled = True
+                        line_number = content[:match.start()].count('\n') + 1
 
-                    peripheral_by_file[relative_path][ptype].append((periph_name, config, line_number, is_disabled))
+                        # Check if peripheral is being disabled
+                        is_disabled = False
+                        if 'UCSWRST' in config or '&= ~' in config or 'OFF' in config:
+                            is_disabled = True
+
+                        peripheral_by_file[relative_path][ptype].append((periph_name, config, line_number, is_disabled))
+                    except IndexError:
+                        # Log the error but continue processing
+                        logger.warning(f"Pattern match error in {relative_path} for {ptype} pattern")
+                        continue
 
         # Check for peripherals enabled in one file but not properly managed in related files
         for file_path, peripherals in peripheral_by_file.items():
@@ -768,38 +787,38 @@ class DeepCodeAnalyzer:
                             self.result.add_issue(issue)
 
 
-    def deep_analyze_code(project_path: str, config: Dict[str, Any] = None) -> DeepAnalysisResult:
-        """Perform deep energy analysis on the specified project path."""
-        analyzer = DeepCodeAnalyzer(project_path, config)
-        return analyzer.analyze()
+def deep_analyze_code(project_path: str, config: Dict[str, Any] = None) -> DeepAnalysisResult:
+    """Perform deep energy analysis on the specified project path."""
+    analyzer = DeepCodeAnalyzer(project_path, config)
+    return analyzer.analyze()
 
 
-    def generate_optimization_summary(result: DeepAnalysisResult) -> Dict[str, Any]:
-        """Generate a summary of optimization opportunities from the analysis result."""
-        summary = {
-            "total_issues": len(result.issues),
-            "total_files_analyzed": result.analyzed_files,
-            "total_energy_impact": result.total_energy_impact,
-            "total_optimization_gain": result.total_optimization_gain,
-            "issue_types": dict(result.issue_types),
-            "file_count": len(result.file_issues),
-            "high_impact_issues": len([i for i in result.issues if i.impact >= 0.7]),
-            "patterns_detected": dict([(p, len(files)) for p, files in result.patterns.items()]),
-            "cross_file_issues": len(result.cross_file_issues),
-            "top_issues": []
-        }
+def generate_optimization_summary(result: DeepAnalysisResult) -> Dict[str, Any]:
+    """Generate a summary of optimization opportunities from the analysis result."""
+    summary = {
+        "total_issues": len(result.issues),
+        "total_files_analyzed": result.analyzed_files,
+        "total_energy_impact": result.total_energy_impact,
+        "total_optimization_gain": result.total_optimization_gain,
+        "issue_types": dict(result.issue_types),
+        "file_count": len(result.file_issues),
+        "high_impact_issues": len([i for i in result.issues if i.impact >= 0.7]),
+        "patterns_detected": dict([(p, len(files)) for p, files in result.patterns.items()]),
+        "cross_file_issues": len(result.cross_file_issues),
+        "top_issues": []
+    }
 
-        # Add top 5 issues by impact
-        for issue in sorted(result.issues, key=lambda x: x.impact, reverse=True)[:5]:
-            summary["top_issues"].append({
-                "type": issue.issue_type,
-                "description": issue.description,
-                "file": issue.location.file,
-                "line": issue.location.line,
-                "impact": issue.impact,
-                "optimization_gain": issue.optimization_gain,
-                "suggestion": issue.suggestion
-            })
+    # Add top 5 issues by impact
+    for issue in sorted(result.issues, key=lambda x: x.impact, reverse=True)[:5]:
+        summary["top_issues"].append({
+            "type": issue.issue_type,
+            "description": issue.description,
+            "file": issue.location.file,
+            "line": issue.location.line,
+            "impact": issue.impact,
+            "optimization_gain": issue.optimization_gain,
+            "suggestion": issue.suggestion
+        })
 
-        return summary
+    return summary
 

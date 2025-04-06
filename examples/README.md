@@ -124,3 +124,93 @@ options:
   --output OUTPUT, -o OUTPUT
                         Output HTML report file
 ```
+
+
+# Przykłady użycia narzędzia komentowania
+
+Narzędzie komentowania pozwala na automatyczne dodawanie sugestii optymalizacji energetycznej do kodu źródłowego na podstawie wyników analizy. Poniżej przedstawiono kilka przykładów użycia tego narzędzia.
+
+## Przykład 1: Podstawowe użycie z interfejsu wiersza poleceń
+
+```bash
+# Uruchomienie komendy comment dla projektu
+python -m infrash_embedded.cli comment /path/to/project --format inline
+
+# Uruchomienie w trybie dry-run (bez wprowadzania zmian)
+python -m infrash_embedded.cli comment /path/to/project --dry-run
+
+# Komentowanie tylko problemów o wysokim wpływie
+python -m infrash_embedded.cli comment /path/to/project --min-impact 0.7
+
+# Generowanie raportu markdown
+python -m infrash_embedded.cli comment /path/to/project --output report.md
+```
+
+## Przykład 2: Użycie skryptu przykładowego comment_example.py
+
+```bash
+# Przejdź do katalogu examples
+cd examples
+
+# Uruchom przykład komentowania
+python comment_example.py
+
+# Uruchomienie z własnymi parametrami (wymaga edycji skryptu)
+# - Otwórz comment_example.py
+# - Zmień parametry w klasie Args
+# - Uruchom skrypt ponownie
+```
+
+## Przykład 3: Użycie niestandardowego narzędzia custom_comment_tool.py
+
+```bash
+# Komentowanie projektu z domyślnymi ustawieniami (próg wpływu 0.7, komentarze inline)
+python custom_comment_tool.py /path/to/project
+
+# Komentowanie wszystkich problemów (próg wpływu 0.0)
+python custom_comment_tool.py /path/to/project --min-impact 0.0
+
+# Używanie formatu TODO zamiast inline
+python custom_comment_tool.py /path/to/project --format todo
+
+# Uruchomienie bez tworzenia kopii zapasowych plików
+python custom_comment_tool.py /path/to/project --no-backup
+
+# Podgląd zmian bez ich wprowadzania (tryb dry-run)
+python custom_comment_tool.py /path/to/project --dry-run
+```
+
+## Przykłady rezultatów komentowania
+
+### Format Inline:
+
+```c
+while(1) { // ENERGY: Busy-wait pattern detected - wastes energy by keeping CPU active - Replace busy-wait with low power mode and interrupts (Impact: 0.75, Gain: 0.15)
+  // Kod wewnątrz pętli
+}
+```
+
+### Format TODO:
+
+```c
+// TODO ENERGY: Busy-wait pattern detected - wastes energy by keeping CPU active - Replace busy-wait with low power mode and interrupts (Impact: 0.75, Gain: 0.15)
+while(1) {
+  // Kod wewnątrz pętli
+}
+```
+
+## Zalecany przepływ pracy
+
+1. **Analiza projektu**: Najpierw wykonaj analizę głęboką aby zidentyfikować problemy energetyczne
+2. **Komentowanie w trybie dry-run**: Sprawdź, jakie zmiany zostaną wprowadzone
+3. **Selektywne komentowanie**: Zacznij od problemów o wysokim wpływie (--min-impact 0.7)
+4. **Przegląd i poprawki**: Przeglądnij dodane komentarze i wprowadź poprawki
+5. **Powtórna analiza**: Po wprowadzeniu poprawek, wykonaj ponowną analizę, aby sprawdzić efekty
+
+## Wskazówki
+
+- Używaj trybu `--dry-run` przed wprowadzeniem rzeczywistych zmian
+- Zawsze twórz kopie zapasowe plików (domyślnie włączone)
+- Zacznij od komentowania tylko problemów o wysokim wpływie
+- Format `inline` jest bardziej kompaktowy, ale może powodować długie linie
+- Format `todo` jest bardziej widoczny i nie zaburza oryginalnego kodu

@@ -22,9 +22,10 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger("energy-optimizer")
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '.')))
 
 # Import from this package
-from ._version import __version__
+from _version import __version__
 
 
 class EnergyIssue:

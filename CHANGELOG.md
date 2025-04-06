@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.6] - 2025-04-06
+
+### Added
+- Changes in examples/EXAMPLES.c
+- Changes in examples/comment_example.py
+- Changes in examples/custom_comment_tool.py
+- Changes in src/infrash_embedded/comment.py
+- Changes in src/infrash_embedded/report.py
+- Changes in str2.md
+
 ## [0.1.5] - 2025-04-06
 
 ### Added
