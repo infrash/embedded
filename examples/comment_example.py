@@ -29,6 +29,9 @@ def main():
             self.format = 'inline'             # Comment format: 'inline' or 'todo'
             self.min_impact = 0.7              # Only comment issues with impact >= this threshold
             self.output = 'energy_report.md'   # Output file for the generated report
+            self.deep_analysis = True          # Enable deep analysis
+            self.mcu_type = 'msp430'           # MCU type for specific optimizations
+            self.report = True                 # Generate a report
 
     args = Args()
 
