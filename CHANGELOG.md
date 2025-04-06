@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.5] - 2025-04-06
+
+### Added
+- Changes in examples/README.md
+- Changes in examples/analyze_example.py
+- Changes in examples/deep_analyze_example.py
+- Changes in examples/deploy_example.py
+- Changes in examples/optimize_example.py
+- Changes in examples/report_example.py
+- Changes in src/infrash_embedded/optimization.py
+
 ## [0.1.4] - 2025-04-06
 
 ### Added

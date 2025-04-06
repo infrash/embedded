@@ -1,3 +1,143 @@
+import argparse
+import os
+import sys
+import logging
+from typing import Dict, List, Any
+import colorama
+from colorama import Fore, Style
+import optimization
+import deep_analyzer
+import analyzer
+
+
+def deep_analyze_command(args):
+    """Handle the 'deep-analyze' command."""
+    print(f"{Fore.BLUE}Performing deep energy analysis on project: {args.project_path}{Style.RESET_ALL}")
+
+    # Import the deep analyzer module
+    from .deep_analyzer import deep_analyze_code, generate_optimization_summary
+
+    # Setup configuration from command line arguments
+    config = {
+        'cross_file_analysis': not args.no_cross_file,
+        'pattern_detection': not args.no_patterns,
+        'mcu_specific': args.mcu_type.lower() if args.mcu_type else True,
+        'find_fix_examples': not args.no_fix_examples
+    }
+
+    # Perform deep analysis
+    result = deep_analyze_code(args.project_path, config)
+
+    # Output results
+    total_issues = len(result.issues)
+    if total_issues > 0:
+        print(f"\n{Fore.GREEN}Found {total_issues} energy optimization issues:{Style.RESET_ALL}")
+
+        # Show issues by type
+        print(f"\n{Fore.CYAN}Issues by type:{Style.RESET_ALL}")
+        for issue_type, count in result.issue_types.items():
+            print(f"- {issue_type}: {count} issues")
+
+        # Show detected patterns if any
+        if result.patterns:
+            print(f"\n{Fore.CYAN}Detected energy patterns:{Style.RESET_ALL}")
+            for pattern, occurrences in result.patterns.items():
+                print(f"- {pattern}: {len(occurrences)} occurrences")
+
+        # Show cross-file issues if any
+        if result.cross_file_issues:
+            print(f"\n{Fore.CYAN}Cross-file issues:{Style.RESET_ALL}")
+            for issue, related_files in result.cross_file_issues:
+                print(f"- {issue.description} in {issue.location.file}:{issue.location.line}")
+                print(f"  Related files: {', '.join(related_files)}")
+
+        # Show top high-impact issues
+        high_impact_issues = [i for i in result.issues if i.impact >= 0.7]
+        if high_impact_issues:
+            print(f"\n{Fore.YELLOW}Top high-impact issues:{Style.RESET_ALL}")
+            for i, issue in enumerate(sorted(high_impact_issues,
+                                             key=lambda x: x.impact, reverse=True)[:5], 1):
+                print(f"{i}. {issue.location.file}:{issue.location.line} - {issue.description}")
+                print(f"   Impact: {issue.impact:.2f}, Optimization gain: {issue.optimization_gain:.2f}")
+                print(f"   Suggestion: {issue.suggestion}")
+
+        # Generate optimization summary
+        summary = generate_optimization_summary(result)
+        print(f"\n{Fore.GREEN}Optimization Summary:{Style.RESET_ALL}")
+        print(f"Total energy impact: {summary['total_energy_impact']:.2f}")
+        print(f"Potential optimization gain: {summary['total_optimization_gain']:.2f} ({summary['total_optimization_gain']*100:.1f}%)")
+
+        # Generate detailed report if requested
+        if args.report:
+            report_content = _generate_deep_analysis_report(result, args.project_path)
+
+            # Write report to file if output is specified
+            if args.output:
+                with open(args.output, 'w') as f:
+                    f.write(report_content)
+                print(f"{Fore.GREEN}Detailed report written to {args.output}{Style.RESET_ALL}")
+            else:
+                print("\n" + report_content)
+    else:
+        print(f"{Fore.GREEN}No energy issues found.{Style.RESET_ALL}")
+
+
+def _generate_deep_analysis_report(result, project_path):
+    """Generate a detailed report from deep analysis results."""
+    report_lines = [
+        "===== Deep Energy Analysis Report =====",
+        f"Project: {project_path}",
+        f"Total issues found: {len(result.issues)}",
+        f"Files analyzed: {result.analyzed_files}",
+        f"Total energy impact: {result.total_energy_impact:.2f}",
+        f"Total optimization gain: {result.total_optimization_gain:.2f} ({result.total_optimization_gain*100:.1f}%)",
+        "\n=== Issue Types ===",
+    ]
+
+    # Add issue types
+    for issue_type, count in result.issue_types.items():
+        report_lines.append(f"- {issue_type}: {count} issues")
+
+    # Add detected patterns
+    if result.patterns:
+        report_lines.append("\n=== Detected Energy Patterns ===")
+        for pattern, occurrences in result.patterns.items():
+            report_lines.append(f"- {pattern}: {len(occurrences)} occurrences")
+
+    # Add cross-file issues
+    if result.cross_file_issues:
+        report_lines.append("\n=== Cross-file Issues ===")
+        for issue, related_files in result.cross_file_issues:
+            report_lines.append(f"- {issue.description} in {issue.location.file}:{issue.location.line}")
+            report_lines.append(f"  Related files: {', '.join(related_files)}")
+
+    # Add detailed issues
+    report_lines.append("\n=== Detailed Issues ===")
+    for i, issue in enumerate(sorted(result.issues, key=lambda x: x.impact, reverse=True), 1):
+        report_lines.append(f"\n{i}. {issue.location.file}:{issue.location.line} - {issue.description}")
+        report_lines.append(f"   Type: {issue.issue_type}")
+        report_lines.append(f"   Impact: {issue.impact:.2f}, Optimization gain: {issue.optimization_gain:.2f}")
+        report_lines.append(f"   Suggestion: {issue.suggestion}")
+
+        if issue.technical_details:
+            report_lines.append(f"   Technical details: {issue.technical_details}")
+
+        if issue.fix_example:
+            report_lines.append(f"   Fix example:\n{issue.fix_example}")
+
+        if issue.references:
+            report_lines.append(f"   References: {', '.join(issue.references)}")
+
+    # Add recommendations
+    report_lines.append("\n=== Recommendations ===")
+    report_lines.append("1. Focus on high-impact issues first, especially those with high optimization gain.")
+    report_lines.append("2. Address cross-file issues to ensure consistent energy management across the codebase.")
+    report_lines.append("3. Review power mode usage and ensure proper peripheral management.")
+    report_lines.append("4. Replace busy-wait and polling patterns with interrupt-driven approaches.")
+    report_lines.append("5. Use appropriate low power modes when the CPU is idle.")
+
+    return "\n".join(report_lines)
+
 def analyze_command(args):
     """Handle the 'analyze' command."""
     print(f"{Fore.BLUE}Analyzing project: {args.project_path}{Style.RESET_ALL}")
@@ -122,6 +262,19 @@ def main():
     analyze_parser.add_argument('--output', '-o', help='Output file for report')
     analyze_parser.set_defaults(func=analyze_command)
 
+    # 'deep-analyze' command
+    deep_analyze_parser = subparsers.add_parser('deep-analyze',
+                                                help='Perform deep energy analysis including cross-file issues and patterns')
+    deep_analyze_parser.add_argument('project_path', help='Path to the project to analyze')
+    deep_analyze_parser.add_argument('--report', '-r', action='store_true', help='Generate a detailed report')
+    deep_analyze_parser.add_argument('--output', '-o', help='Output file for report')
+    deep_analyze_parser.add_argument('--no-cross-file', action='store_true', help='Disable cross-file analysis')
+    deep_analyze_parser.add_argument('--no-patterns', action='store_true', help='Disable pattern detection')
+    deep_analyze_parser.add_argument('--no-fix-examples', action='store_true', help='Disable generation of fix examples')
+    deep_analyze_parser.add_argument('--mcu-type', choices=['msp430', 'arm', 'avr', 'pic', 'generic'],
+                                     help='Microcontroller type for specific optimizations')
+    deep_analyze_parser.set_defaults(func=deep_analyze_command)
+
     # 'optimize' command
     optimize_parser = subparsers.add_parser('optimize', help='Optimize code for energy efficiency')
     optimize_parser.add_argument('project_path', help='Path to the project to optimize')
@@ -132,9 +285,19 @@ def main():
     # 'report' command
     report_parser = subparsers.add_parser('report', help='Generate a report on energy efficiency')
     report_parser.add_argument('project_path', help='Path to the project to report on')
-    report_parser.add_argument('--format', '-f', choices=['text', 'markdown'], help='Report format')
+    report_parser.add_argument('--format', '-f', choices=['text', 'markdown', 'html', 'json'],
+                               help='Report format')
     report_parser.add_argument('--output', '-o', help='Output file for report')
     report_parser.set_defaults(func=report_command)
+
+    # 'comment' command - new command to add energy comments to source files
+    comment_parser = subparsers.add_parser('comment', help='Add energy optimization comments to source files')
+    comment_parser.add_argument('project_path', help='Path to the project to comment')
+    comment_parser.add_argument('--dry-run', action='store_true', help='Show what would be done without making changes')
+    comment_parser.add_argument('--no-backup', action='store_true', help='Skip creating backup files')
+    comment_parser.add_argument('--format', choices=['inline', 'todo'], default='inline',
+                                help='Comment format (inline or TODO style)')
+    comment_parser.set_defaults(func=comment_command)
 
     # 'deploy' command
     deploy_parser = subparsers.add_parser('deploy', help='Deploy optimized code')
@@ -167,268 +330,3 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"An error occurred: {e}")
         sys.exit(1)#!/usr/bin/env python3
-"""
-Energy Optimizer - CLI Tool for Embedded Systems Energy Optimization
-
-A comprehensive tool for analyzing and optimizing energy consumption
-in embedded systems, particularly MSP430 microcontrollers.
-"""
-
-import argparse
-import os
-import sys
-import logging
-from typing import Dict, List, Any
-import colorama
-from colorama import Fore, Style
-
-# Initialize colorama
-colorama.init()
-
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger("energy-optimizer")
-
-# Import from this package
-from ._version import __version__
-
-
-class EnergyIssue:
-    """Representation of an energy-related issue found in code."""
-
-    def __init__(self, issue_type: str, file: str, line: int, description: str, impact: float, suggestion: str):
-        self.issue_type = issue_type  # E.g., "inefficient_loop", "suboptimal_sleep_mode"
-        self.file = file
-        self.line = line
-        self.description = description
-        self.impact = impact  # Estimated energy impact (0.0-1.0)
-        self.suggestion = suggestion
-
-    def __str__(self) -> str:
-        return f"{self.file}:{self.line} - {self.description} (Impact: {self.impact:.2f})"
-
-
-class CodeAnalyzer:
-    """Analyzes code for energy inefficiencies."""
-
-    def __init__(self, project_path: str, config: Dict[str, Any] = None):
-        self.project_path = os.path.abspath(project_path)
-        self.config = config or {}
-        self.issues: List[EnergyIssue] = []
-
-    def analyze(self) -> List[EnergyIssue]:
-        """Perform full code analysis."""
-        logger.info(f"Analyzing project at {self.project_path}")
-
-        # Placeholder for actual implementation
-        # In a real implementation, this would:
-        # 1. Parse code files into AST
-        # 2. Run various analyzers on the AST
-        # 3. Collect and prioritize issues
-
-        self._scan_files()
-        return self.issues
-
-    def _scan_files(self):
-        """Scan files in the project directory."""
-        logger.debug("Scanning files")
-
-        for root, _, files in os.walk(self.project_path):
-            for file in files:
-                if file.endswith(('.c', '.h', '.cpp', '.hpp')):
-                    file_path = os.path.join(root, file)
-                    relative_path = os.path.relpath(file_path, self.project_path)
-                    self._analyze_file(file_path, relative_path)
-
-    def _analyze_file(self, file_path: str, relative_path: str):
-        """Analyze a single file."""
-        logger.debug(f"Analyzing file: {relative_path}")
-
-        # This is a placeholder - in a real implementation, 
-        # we would parse the file and analyze the AST
-
-        # Example dummy issues for demonstration
-        if relative_path.endswith('.c') or relative_path.endswith('.cpp'):
-            # Simulated issue detection
-            self.issues.append(
-                EnergyIssue(
-                    "inefficient_loop",
-                    relative_path,
-                    25,
-                    "Inefficient loop detected - unnecessary computations inside loop",
-                    0.7,
-                    "Move invariant computations outside the loop"
-                )
-            )
-
-            self.issues.append(
-                EnergyIssue(
-                    "suboptimal_sleep_mode",
-                    relative_path,
-                    42,
-                    "Suboptimal sleep mode being used",
-                    0.8,
-                    "Use LPM3 instead of LPM0 for longer idle periods"
-                )
-            )
-
-
-class CodeOptimizer:
-    """Optimizes code based on identified issues."""
-
-    def __init__(self, project_path: str, issues: List[EnergyIssue]):
-        self.project_path = project_path
-        self.issues = issues
-
-    def optimize(self) -> Dict[str, Any]:
-        """Apply optimizations based on identified issues."""
-        logger.info(f"Optimizing project at {self.project_path}")
-
-        # This is a placeholder - in a real implementation, 
-        # we would apply optimizations to the code
-
-        results = {
-            "total_issues": len(self.issues),
-            "fixed_issues": 0,
-            "estimated_energy_reduction": 0.0,
-            "modified_files": []
-        }
-
-        # Simulate optimization process
-        for issue in self.issues:
-            # In a real implementation, we would:
-            # 1. Parse the file
-            # 2. Apply the optimization
-            # 3. Write back the modified file
-
-            # For now, just count issues that could be automatically fixed
-            if issue.impact > 0.5:  # Simulate automated fixing for high-impact issues
-                results["fixed_issues"] += 1
-                if issue.file not in results["modified_files"]:
-                    results["modified_files"].append(issue.file)
-
-                # Accumulate estimated energy reduction
-                results["estimated_energy_reduction"] += issue.impact * 0.1  # Simplified calculation
-
-        logger.info(f"Optimization completed. Fixed {results['fixed_issues']} issues.")
-        return results
-
-
-class ReportGenerator:
-    """Generates reports about energy analysis and optimization."""
-
-    def __init__(self, project_path: str, issues: List[EnergyIssue], optimization_results: Dict[str, Any] = None):
-        self.project_path = project_path
-        self.issues = issues
-        self.optimization_results = optimization_results
-
-    def generate_report(self, format_type: str = "text") -> str:
-        """Generate a report in the specified format."""
-        logger.info(f"Generating {format_type} report")
-
-        if format_type == "markdown":
-            return self._generate_markdown_report()
-        else:
-            return self._generate_text_report()
-
-    def _generate_text_report(self) -> str:
-        """Generate a plain text report."""
-        report_lines = [
-            "=== Energy Optimization Report ===",
-            f"Project: {self.project_path}",
-            f"Total issues found: {len(self.issues)}",
-            "\nDetailed Issues:",
-        ]
-
-        # Group issues by file
-        issues_by_file = {}
-        for issue in self.issues:
-            if issue.file not in issues_by_file:
-                issues_by_file[issue.file] = []
-            issues_by_file[issue.file].append(issue)
-
-        # Add issues to report
-        for file, file_issues in issues_by_file.items():
-            report_lines.append(f"\nFile: {file}")
-            for issue in file_issues:
-                report_lines.append(f"  Line {issue.line}: {issue.description}")
-                report_lines.append(f"    Impact: {issue.impact:.2f}")
-                report_lines.append(f"    Suggestion: {issue.suggestion}")
-
-        # Add optimization results if available
-        if self.optimization_results:
-            report_lines.append("\n=== Optimization Results ===")
-            report_lines.append(f"Fixed issues: {self.optimization_results['fixed_issues']}/{len(self.issues)}")
-            report_lines.append(f"Estimated energy reduction: {self.optimization_results['estimated_energy_reduction']*100:.1f}%")
-            report_lines.append(f"Modified files: {len(self.optimization_results['modified_files'])}")
-
-        return "\n".join(report_lines)
-
-    def _generate_markdown_report(self) -> str:
-        """Generate a markdown report."""
-        report_lines = [
-            "# Energy Optimization Report",
-            "",
-            f"## Project: {self.project_path}",
-            "",
-            f"**Total issues found:** {len(self.issues)}",
-            "",
-            "## Detailed Issues",
-            ""
-        ]
-
-        # Group issues by file
-        issues_by_file = {}
-        for issue in self.issues:
-            if issue.file not in issues_by_file:
-                issues_by_file[issue.file] = []
-            issues_by_file[issue.file].append(issue)
-
-        # Add issues to report
-        for file, file_issues in issues_by_file.items():
-            report_lines.append(f"### File: `{file}`")
-            report_lines.append("")
-            report_lines.append("| Line | Issue Type | Description | Impact | Suggestion |")
-            report_lines.append("|------|------------|-------------|--------|------------|")
-            for issue in sorted(file_issues, key=lambda x: x.line):
-                report_lines.append(f"| {issue.line} | {issue.issue_type} | {issue.description} | {issue.impact:.2f} | {issue.suggestion} |")
-            report_lines.append("")
-
-        # Add optimization results if available
-        if self.optimization_results:
-            report_lines.append("## Optimization Results")
-            report_lines.append("")
-            report_lines.append(f"**Fixed issues:** {self.optimization_results['fixed_issues']}/{len(self.issues)}")
-            report_lines.append(f"**Estimated energy reduction:** {self.optimization_results['estimated_energy_reduction']*100:.1f}%")
-            report_lines.append("")
-            report_lines.append("### Modified Files")
-            report_lines.append("")
-            for file in self.optimization_results['modified_files']:
-                report_lines.append(f"- `{file}`")
-
-        return "\n".join(report_lines)
-
-
-class Deployer:
-    """Handles deployment of optimized code."""
-
-    def __init__(self, project_path: str, server: str):
-        self.project_path = project_path
-        self.server = server
-
-    def deploy(self) -> bool:
-        """Deploy the optimized code to the specified server."""
-        logger.info(f"Deploying project {self.project_path} to {self.server}")
-
-        # This is a placeholder - in a real implementation, 
-        # we would handle the actual deployment logic
-
-        # Simulate a deployment process
-        logger.info("Committing changes...")
-        logger.info("Pushing to remote repository...")
-        logger.info("Triggering CI/CD pipeline...")
-
-        return True
