@@ -1,11 +1,31 @@
-# __init__.py
-# Version information
+"""
+Energy Optimizer - A tool for analyzing and optimizing energy consumption in embedded systems.
 
-# Import only basic package information here
-# Avoid importing components directly to prevent circular imports
-from infrash_embedded.infrash_embedded import infrash_embedded
+This package provides tools for analyzing embedded code for energy inefficiencies,
+suggesting optimizations, and generating reports.
+"""
 
-__version__ = "0.1.2"
-__version_tuple__ = (0, 1, 1)
+from ._version import __version__
 
-__all__ = ["infrash_embedded","infrash_embedded"]
+from .analyzer import (
+    EnergyIssue,
+    SourceLocation,
+    analyze_code,
+    CodeAnalysisManager,
+    CodeParser,
+    LoopAnalyzer,
+    SleepModeAnalyzer,
+    PeripheralAnalyzer,
+    ClockConfigAnalyzer,
+    MSP430RegisterAnalyzer
+)
+
+# Define what's available for import
+__all__ = [
+    '__version__',
+    'EnergyIssue',
+    'SourceLocation',
+    'analyze_code',
+    'CodeAnalysisManager',
+    'CodeParser',
+]
