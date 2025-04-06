@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.4] - 2025-04-06
+
+### Added
+- Changes in examples/analyze.py
+- Changes in src/infrash_embedded/deep_analyzer.py
+
 ## [0.1.3] - 2025-04-06
 
 ### Added
